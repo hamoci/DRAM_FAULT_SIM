@@ -51,6 +51,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <iostream>
 #include <list>
+#include <map>
+#include <set>
 #include <string>
 #include <memory>
 
@@ -58,7 +60,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "common.hh"
 #include "util.hh"
 
-#define FIXED_FITRATE
+//#define FIXED_FITRATE  // hamoci: Commented out to use actual calculated FIT rates
 
 #define MODULEC
 // default DIMM of 16GB
@@ -158,7 +160,8 @@ class FaultRateInfo {
   FaultRateInfo() { totalRate = .0; }
 
  protected:
-  void setDetailedError(bool detailed) { detailed_error = detailed; }
+  //void setDetailedError(bool detailed) { detailed_error = detailed; } //original
+  void setDetailedError(bool detailed) { detailed_error = false; } //hamoci add
  private:
   bool detailed_error = true;
   std::string convertToSimpleError(std::string name) {
@@ -347,6 +350,65 @@ class FaultRateInfo {
     for (auto it = rateInfo.cbegin(); it != rateInfo.cend(); it++) {
       std::cout << (*it).first << " @ FIT rate " << (*it).second << std::endl;
     }
+  }
+
+  //! print domain-wise FIT rates (hamoci add)
+  void printDomainFaults() {
+    std::map<std::string, double> domainFits_p;  // permanent
+    std::map<std::string, double> domainFits_t;  // transient
+
+    // Sum FIT rates for each domain, separated by type
+    for (auto it = rateInfo.cbegin(); it != rateInfo.cend(); it++) {
+      std::string name = (*it).first;
+      double fit = (*it).second;
+
+      // Extract domain and type
+      std::string domain = name.substr(0, name.length() - 2);
+      std::string type = name.substr(name.length() - 2);
+
+      if (type == "-p") {
+        domainFits_p[domain] += fit;
+      } else if (type == "-t") {
+        domainFits_t[domain] += fit;
+      } else {
+        // For "inherent" or other special cases without suffix
+        domainFits_p[domain] += fit;
+      }
+    }
+
+    // Print domain-wise FIT rates (convert to actual FIT by multiplying 1e9)
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "Domain-wise FIT Rates:" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    double total_p = 0.0, total_t = 0.0;
+
+    // Collect all unique domains
+    std::set<std::string> allDomains;
+    for (auto it = domainFits_p.begin(); it != domainFits_p.end(); it++) {
+      allDomains.insert(it->first);
+    }
+    for (auto it = domainFits_t.begin(); it != domainFits_t.end(); it++) {
+      allDomains.insert(it->first);
+    }
+
+    // Print each domain with both permanent and transient
+    for (auto domain : allDomains) {
+      double fit_p = domainFits_p[domain] * 1e9;  // Convert to FIT
+      double fit_t = domainFits_t[domain] * 1e9;  // Convert to FIT
+
+      std::cout << domain << "-p\t\t" << fit_p << " FIT" << std::endl;
+      std::cout << domain << "-t\t\t" << fit_t << " FIT" << std::endl;
+
+      total_p += fit_p;
+      total_t += fit_t;
+    }
+
+    std::cout << "----------------------------------------" << std::endl;
+    std::cout << "TOTAL-p\t\t" << total_p << " FIT" << std::endl;
+    std::cout << "TOTAL-t\t\t" << total_t << " FIT" << std::endl;
+    std::cout << "TOTAL\t\t" << (total_p + total_t) << " FIT" << std::endl;
+    std::cout << "========================================\n" << std::endl;
   }
   // std::string pickRandomType() {
   //! pick a random fault type from the list, proportionally to its rate

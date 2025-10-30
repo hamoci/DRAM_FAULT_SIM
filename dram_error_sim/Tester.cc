@@ -156,6 +156,7 @@ void TesterSystem::test(DomainGroup *dg, ECC *ecc, Scrubber *scrubber,
   FILE *fd = fopen(nameBuffer.c_str(), "w");
   assert(fd != NULL);
   dg->pickRandomFD()->faultRateInfo->printFaults();
+  dg->pickRandomFD()->faultRateInfo->printDomainFaults();  // hamoci add: print domain-wise FIT
 
   // reset statistics
   reset();
